@@ -1,59 +1,88 @@
 /**
- * TypeScript functions to test sign-pdf-advanced endpoint
- * Base URL: http://localhost:5000 (adjust as needed)
- * Requires: Bearer token for authorization
+ * =============================================================================
+ * TEST FUNCTIONS FOR SIGN-PDF-ADVANCED API ENDPOINT
+ * =============================================================================
+ * 
+ * File này chứa các functions để test API ký PDF nâng cao với nhiều loại chữ ký.
+ * Backend: TaskstreamForge_MySignBackend\Controllers\MySignController.SignPdfAdvanced.cs
+ * 
+ * API hỗ trợ 4 loại chữ ký:
+ * 1. TextOnly: Chỉ hiển thị text
+ * 2. ImageOnly: Chỉ hiển thị ảnh chữ ký
+ * 3. ImageAndText: Kết hợp ảnh + text tùy chỉnh
+ * 4. ImageNameDateComment: Hiển thị đầy đủ (ảnh + tên + ngày + comment)
+ * 
+ * Có thể ký ẩn bằng cách truyền null cho signatureCoordinates
  */
 
 // ==================== TYPE DEFINITIONS ====================
 
-/** Các loại chữ ký có thể sử dụng */
+/** 
+ * Các loại chữ ký được hỗ trợ
+ * - TextOnly: Chỉ text, không có ảnh
+ * - ImageOnly: Chỉ ảnh chữ ký, không có text
+ * - ImageAndText: Ảnh + text tùy chỉnh
+ * - ImageNameDateComment: Ảnh + tên người ký + ngày ký + lý do
+ */
 export type SignType = 'TextOnly' | 'ImageOnly' | 'ImageAndText' | 'ImageNameDateComment';
 
-/** Tọa độ và thông tin cho một chữ ký */
+/** 
+ * Tọa độ và thông tin cho một chữ ký trên PDF
+ * Hệ tọa độ: Gốc (0,0) ở góc TRÊN TRÁI, X tăng sang phải, Y tăng xuống dưới
+ */
 export interface SignatureCoordinate {
-    /** Số trang (bắt đầu từ 1) */
-    PageNumber: number;
-    /** Tọa độ X từ trái (pixels) */
-    Left: number;
-    /** Tọa độ Y từ trên (pixels) */
-    Top: number;
-    /** Chiều rộng của chữ ký (pixels) */
-    Width: number;
-    /** Chiều cao của chữ ký (pixels) */
-    Height: number;
-    /** Loại chữ ký */
-    SignType: SignType;
-    /** Text hiển thị (optional, dùng cho TextOnly và ImageAndText) */
-    SignText?: string;
+    PageNumber: number;    // Số trang (bắt đầu từ 1)
+    Left: number;          // Khoảng cách từ lề trái (pixels)
+    Top: number;           // Khoảng cách từ lề trên (pixels)
+    Width: number;         // Chiều rộng khung chữ ký (pixels)
+    Height: number;        // Chiều cao khung chữ ký (pixels)
+    SignType: SignType;    // Loại chữ ký
+    SignText?: string;     // Text tùy chỉnh (cho TextOnly và ImageAndText)
+    SignFontSize?: number; // Kích thước font chữ (optional)
 }
 
 /** Tùy chọn cho việc ký PDF */
 export interface SignPdfOptions {
-    /** Bearer token để xác thực */
-    token?: string;
-    /** ID của chứng thư số */
-    certificateId?: string;
-    /** Tiêu đề giao dịch ký */
-    signTransactionTitle?: string;
-    /** Lý do ký */
-    reason?: string;
-    /** Địa điểm ký */
-    location?: string;
+    token?: string;                  // Bearer token để xác thực
+    certificateId?: string;          // ID của chứng thư số
+    signTransactionTitle?: string;   // Tiêu đề giao dịch ký
+    reason?: string;                 // Lý do ký
+    location?: string;               // Địa điểm ký
 }
 
 // ==================== CONSTANTS ====================
 
-const BASE_URL = 'http://localhost:5000'; // Adjust this to your API URL
+const BASE_URL = 'http://171.244.49.4';
 const API_ENDPOINT = '/api/my-sign/sign-pdf-advanced';
 
 // ==================== FUNCTIONS ====================
 
 /**
- * Helper function to create FormData and make request to sign PDF
+ * ============================================================================
+ * MAIN FUNCTION: Ký PDF với tọa độ nâng cao
+ * ============================================================================
+ * 
+ * Function chính để gọi API sign-pdf-advanced
+ * 
  * @param pdfFile - File PDF cần ký
- * @param signatureCoordinates - Mảng tọa độ chữ ký hoặc null nếu ký ẩn
- * @param options - Các tùy chọn bổ sung
- * @returns Blob của file PDF đã ký
+ * @param signatureCoordinates - Mảng tọa độ chữ ký, hoặc null để ký ẩn
+ * @param options - Các tùy chọn bổ sung (token, certificateId, reason,...)
+ * @returns Promise<Blob> - Blob của file PDF đã ký
+ * 
+ * @example
+ * // Ký ẩn (không hiển thị chữ ký trên PDF)
+ * await signPdfAdvanced(pdfFile, null, { token: 'YOUR_TOKEN' });
+ * 
+ * @example
+ * // Ký với 1 chữ ký TextOnly
+ * const coords = [{
+ *   PageNumber: 1,
+ *   Left: 50, Top: 50,
+ *   Width: 200, Height: 80,
+ *   SignType: 'TextOnly',
+ *   SignText: 'Đã ký bởi: Nguyễn Văn A'
+ * }];
+ * await signPdfAdvanced(pdfFile, coords, { token: 'YOUR_TOKEN' });
  */
 export async function signPdfAdvanced(
     pdfFile: File,
@@ -68,13 +97,16 @@ export async function signPdfAdvanced(
         options
     });
     
+    // Bước 1: Tạo FormData để gửi lên server
     const formData = new FormData();
     formData.append('FileUpload', pdfFile);
     
+    // Bước 2: Thêm tọa độ chữ ký (nếu có)
     if (signatureCoordinates) {
         formData.append('SignatureCoordinates', JSON.stringify(signatureCoordinates));
     }
     
+    // Bước 3: Thêm các tùy chọn bổ sung
     if (options.certificateId) {
         formData.append('CertificateId', options.certificateId);
     }
@@ -86,11 +118,12 @@ export async function signPdfAdvanced(
     formData.append('Reason', options.reason || 'Test signing');
     formData.append('Location', options.location || 'Hà Nội');
     
-    const token = options.token || 'YOUR_BEARER_TOKEN'; // Replace with actual token
+    const token = options.token || 'YOUR_BEARER_TOKEN';
     
     console.log('📡 [signPdfAdvanced] Gửi request đến:', `${BASE_URL}${API_ENDPOINT}`);
     
     try {
+        // Bước 4: Gọi API
         const response = await fetch(`${BASE_URL}${API_ENDPOINT}`, {
             method: 'POST',
             headers: {
@@ -99,15 +132,16 @@ export async function signPdfAdvanced(
             body: formData
         });
         
+        // Bước 5: Kiểm tra response
         if (!response.ok) {
             const json = await response.json();
             throw new Error(`HTTP ${response.status}: ${json.message}`);
         }
         
-        // Get the signed PDF as blob
+        // Bước 6: Nhận file PDF đã ký
         const blob = await response.blob();
         
-        // Download the file
+        // Bước 7: Tự động tải file về máy
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -126,37 +160,29 @@ export async function signPdfAdvanced(
     }
 }
 
+// ==================== TEST CASES ====================
+
 /**
- * Test Case 1: Empty coordinates (hidden signature)
- * Ký ẩn - không hiển thị chữ ký trên PDF
- * @param pdfFile - File PDF cần ký
- * @param token - Bearer token để xác thực
- * @returns Blob của file PDF đã ký
+ * TEST 1: Ký ẩn (Hidden Signature)
+ * Không hiển thị chữ ký trên PDF, chỉ có chữ ký điện tử ẩn
  */
 export async function testEmptyCoordinates(pdfFile: File, token: string): Promise<Blob> {
-    console.log('🧪 [testEmptyCoordinates] Test 1: Empty Coordinates (Hidden Signature)');
-    console.log('📋 [testEmptyCoordinates] Tham số:', { fileName: pdfFile.name, hasToken: !!token });
+    console.log('🧪 Test 1: Hidden Signature');
     
-    const result = await signPdfAdvanced(pdfFile, null, {
+    return await signPdfAdvanced(pdfFile, null, {
         token,
         reason: 'Ký ẩn - không hiển thị',
         location: 'Hà Nội',
         signTransactionTitle: 'Test Hidden Signature'
     });
-    console.log('✅ [testEmptyCoordinates] Hoàn thành!');
-    return result;
 }
 
 /**
- * Test Case 2: Text Only signature
- * Chỉ có text, không có hình ảnh
- * @param pdfFile - File PDF cần ký
- * @param token - Bearer token để xác thực
- * @returns Blob của file PDF đã ký
+ * TEST 2: TextOnly Signature
+ * Chỉ hiển thị text, không có ảnh chữ ký
  */
 export async function testTextOnlySignature(pdfFile: File, token: string): Promise<Blob> {
-    console.log('🧪 [testTextOnlySignature] Test 2: TextOnly Signature');
-    console.log('📋 [testTextOnlySignature] Tham số:', { fileName: pdfFile.name, hasToken: !!token });
+    console.log('🧪 Test 2: TextOnly Signature');
     
     const coordinates: SignatureCoordinate[] = [
         {
@@ -165,32 +191,25 @@ export async function testTextOnlySignature(pdfFile: File, token: string): Promi
             Top: 50,
             Width: 200,
             Height: 80,
-            SignType: 'TextOnly' as const,
+            SignType: 'TextOnly',
             SignText: 'Đã ký bởi: Nguyễn Văn A\nNgày: 17/10/2025'
         }
     ];
-    console.log('📍 [testTextOnlySignature] Tọa độ:', coordinates);
     
-    const result = await signPdfAdvanced(pdfFile, coordinates, {
+    return await signPdfAdvanced(pdfFile, coordinates, {
         token,
         reason: 'Kiểm tra chữ ký text only',
         location: 'Hà Nội',
         signTransactionTitle: 'Test TextOnly'
     });
-    console.log('✅ [testTextOnlySignature] Hoàn thành!');
-    return result;
 }
 
 /**
- * Test Case 3: Image Only signature
- * Chỉ có hình ảnh chữ ký, không có text
- * @param pdfFile - File PDF cần ký
- * @param token - Bearer token để xác thực
- * @returns Blob của file PDF đã ký
+ * TEST 3: ImageOnly Signature
+ * Chỉ hiển thị ảnh chữ ký, không có text
  */
 export async function testImageOnlySignature(pdfFile: File, token: string): Promise<Blob> {
-    console.log('🧪 [testImageOnlySignature] Test 3: ImageOnly Signature');
-    console.log('📋 [testImageOnlySignature] Tham số:', { fileName: pdfFile.name, hasToken: !!token });
+    console.log('🧪 Test 3: ImageOnly Signature');
     
     const coordinates: SignatureCoordinate[] = [
         {
@@ -199,31 +218,24 @@ export async function testImageOnlySignature(pdfFile: File, token: string): Prom
             Top: 50,
             Width: 150,
             Height: 100,
-            SignType: 'ImageOnly' as const
+            SignType: 'ImageOnly'
         }
     ];
-    console.log('📍 [testImageOnlySignature] Tọa độ:', coordinates);
     
-    const result = await signPdfAdvanced(pdfFile, coordinates, {
+    return await signPdfAdvanced(pdfFile, coordinates, {
         token,
         reason: 'Kiểm tra chữ ký image only',
         location: 'Hà Nội',
         signTransactionTitle: 'Test ImageOnly'
     });
-    console.log('✅ [testImageOnlySignature] Hoàn thành!');
-    return result;
 }
 
 /**
- * Test Case 4: Image and Text signature
- * Có cả hình ảnh và text
- * @param pdfFile - File PDF cần ký
- * @param token - Bearer token để xác thực
- * @returns Blob của file PDF đã ký
+ * TEST 4: ImageAndText Signature
+ * Hiển thị ảnh chữ ký + text tùy chỉnh
  */
 export async function testImageAndTextSignature(pdfFile: File, token: string): Promise<Blob> {
-    console.log('🧪 [testImageAndTextSignature] Test 4: ImageAndText Signature');
-    console.log('📋 [testImageAndTextSignature] Tham số:', { fileName: pdfFile.name, hasToken: !!token });
+    console.log('🧪 Test 4: ImageAndText Signature');
     
     const coordinates: SignatureCoordinate[] = [
         {
@@ -232,32 +244,25 @@ export async function testImageAndTextSignature(pdfFile: File, token: string): P
             Top: 200,
             Width: 250,
             Height: 120,
-            SignType: 'ImageAndText' as const,
+            SignType: 'ImageAndText',
             SignText: 'Tôi xác nhận đã đọc và đồng ý'
         }
     ];
-    console.log('📍 [testImageAndTextSignature] Tọa độ:', coordinates);
     
-    const result = await signPdfAdvanced(pdfFile, coordinates, {
+    return await signPdfAdvanced(pdfFile, coordinates, {
         token,
         reason: 'Kiểm tra chữ ký image + text',
         location: 'Hà Nội',
         signTransactionTitle: 'Test ImageAndText'
     });
-    console.log('✅ [testImageAndTextSignature] Hoàn thành!');
-    return result;
 }
 
 /**
- * Test Case 5: Image + Name + Date + Comment signature
- * Hiển thị đầy đủ thông tin: Ảnh + Tên + Ngày + Comment
- * @param pdfFile - File PDF cần ký
- * @param token - Bearer token để xác thực
- * @returns Blob của file PDF đã ký
+ * TEST 5: ImageNameDateComment Signature
+ * Hiển thị đầy đủ: Ảnh + Tên người ký + Ngày ký + Lý do
  */
 export async function testImageNameDateCommentSignature(pdfFile: File, token: string): Promise<Blob> {
-    console.log('🧪 [testImageNameDateCommentSignature] Test 5: ImageNameDateComment Signature');
-    console.log('📋 [testImageNameDateCommentSignature] Tham số:', { fileName: pdfFile.name, hasToken: !!token });
+    console.log('🧪 Test 5: ImageNameDateComment Signature');
     
     const coordinates: SignatureCoordinate[] = [
         {
@@ -266,251 +271,215 @@ export async function testImageNameDateCommentSignature(pdfFile: File, token: st
             Top: 200,
             Width: 200,
             Height: 100,
-            SignType: 'ImageNameDateComment' as const
+            SignType: 'ImageNameDateComment'
         }
     ];
-    console.log('📍 [testImageNameDateCommentSignature] Tọa độ:', coordinates);
     
-    const result = await signPdfAdvanced(pdfFile, coordinates, {
+    return await signPdfAdvanced(pdfFile, coordinates, {
         token,
         reason: 'Kiểm tra đầy đủ',
         location: 'Hà Nội',
         signTransactionTitle: 'Test Full Info'
     });
-    console.log('✅ [testImageNameDateCommentSignature] Hoàn thành!');
-    return result;
 }
 
 /**
- * Test Case 6: Multiple signatures with different types
- * Nhiều chữ ký với nhiều loại khác nhau trên cùng tài liệu
- * @param pdfFile - File PDF cần ký
- * @param token - Bearer token để xác thực
- * @returns Blob của file PDF đã ký
+ * TEST 6: Multiple Signatures (Mixed Types)
+ * Ký nhiều chữ ký với các loại khác nhau trên cùng 1 trang
  */
 export async function testMultipleSignatures(pdfFile: File, token: string): Promise<Blob> {
-    console.log('🧪 [testMultipleSignatures] Test 6: Multiple Signatures (Mixed Types)');
-    console.log('📋 [testMultipleSignatures] Tham số:', { fileName: pdfFile.name, hasToken: !!token });
+    console.log('🧪 Test 6: Multiple Signatures (4 loại khác nhau)');
     
     const coordinates: SignatureCoordinate[] = [
         // TextOnly ở góc trên trái
         {
             PageNumber: 1,
-            Left: 50,
-            Top: 50,
-            Width: 180,
-            Height: 60,
-            SignType: 'TextOnly' as const,
+            Left: 50, Top: 50,
+            Width: 180, Height: 60,
+            SignType: 'TextOnly',
             SignText: 'Người duyệt: Nguyễn Văn A'
         },
         // ImageOnly ở góc trên phải
         {
             PageNumber: 1,
-            Left: 400,
-            Top: 50,
-            Width: 120,
-            Height: 80,
-            SignType: 'ImageOnly' as const
+            Left: 400, Top: 50,
+            Width: 120, Height: 80,
+            SignType: 'ImageOnly'
         },
         // ImageAndText ở giữa
         {
             PageNumber: 1,
-            Left: 200,
-            Top: 300,
-            Width: 220,
-            Height: 100,
-            SignType: 'ImageAndText' as const,
+            Left: 200, Top: 300,
+            Width: 220, Height: 100,
+            SignType: 'ImageAndText',
             SignText: 'Đã kiểm tra và phê duyệt'
         },
         // ImageNameDateComment ở góc dưới phải
         {
             PageNumber: 1,
-            Left: 400,
-            Top: 600,
-            Width: 180,
-            Height: 90,
-            SignType: 'ImageNameDateComment' as const
+            Left: 400, Top: 600,
+            Width: 180, Height: 90,
+            SignType: 'ImageNameDateComment'
         }
     ];
-    console.log('📍 [testMultipleSignatures] Tọa độ (4 chữ ký):', coordinates);
     
-    const result = await signPdfAdvanced(pdfFile, coordinates, {
+    return await signPdfAdvanced(pdfFile, coordinates, {
         token,
         reason: 'Kiểm tra nhiều chữ ký',
         location: 'Hà Nội',
         signTransactionTitle: 'Test Multiple Signatures'
     });
-    console.log('✅ [testMultipleSignatures] Hoàn thành!');
-    return result;
 }
 
 /**
- * Test Case 7: Multiple signatures on different pages
- * Nhiều chữ ký trên các trang khác nhau
- * @param pdfFile - File PDF cần ký
- * @param token - Bearer token để xác thực
- * @returns Blob của file PDF đã ký
+ * TEST 7: Multiple Pages
+ * Ký nhiều chữ ký trên nhiều trang khác nhau
  */
 export async function testMultiplePages(pdfFile: File, token: string): Promise<Blob> {
-    console.log('🧪 [testMultiplePages] Test 7: Multiple Pages');
-    console.log('📋 [testMultiplePages] Tham số:', { fileName: pdfFile.name, hasToken: !!token });
+    console.log('🧪 Test 7: Multiple Pages');
     
     const coordinates: SignatureCoordinate[] = [
         {
-            PageNumber: 1,
-            Left: 50,
-            Top: 100,
-            Width: 200,
-            Height: 80,
-            SignType: 'ImageOnly' as const,
-            SignText: 'Trang 1 - Đã ký'
-        },
-        {
-            PageNumber: 3,
-            Left: 50,
-            Top: 100,
-            Width: 200,
-            Height: 80,
-            SignType: 'ImageOnly' as const,
-            SignText: 'Trang 1 - Đã ký'
+            PageNumber: 2,
+            Left: 50, Top: 100,
+            Width: 200, Height: 80,
+            SignType: 'ImageOnly'
         },
         {
             PageNumber: 2,
-            Left: 50,
-            Top: 100,
-            Width: 200,
-            Height: 80,
-            SignType: 'ImageNameDateComment' as const
+            Left: 10, Top: 100,
+            Width: 200, Height: 80,
+            SignType: 'ImageNameDateComment'
         },
         {
-            PageNumber: 3,
-            Left: 100,
-            Top: 50,
-            Width: 150,
-            Height: 70,
-            SignType: 'TextOnly' as const,
-            SignText: 'XXX10XXXX'
+            PageNumber: 2,
+            Left: 300, Top: 50,
+            Width: 150, Height: 70,
+            SignType: 'TextOnly',
+            SignText: 'XXX10XXXX',
+            SignFontSize: 20
         },
         {
-            PageNumber: 1,
-            Left: 100,
-            Top: 50,
-            Width: 150,
-            Height: 70,
-            SignType: 'TextOnly' as const,
+            PageNumber: 2,
+            Left: 100, Top: 50,
+            Width: 150, Height: 70,
+            SignType: 'TextOnly',
             SignText: 'XXX10XXXX'
         }
     ];
-    console.log('📍 [testMultiplePages] Tọa độ (3 trang):', coordinates);
     
-    const result = await signPdfAdvanced(pdfFile, coordinates, {
+    return await signPdfAdvanced(pdfFile, coordinates, {
         token,
         reason: 'Ký nhiều trang',
         location: 'Hà Nội',
         signTransactionTitle: 'Test Multiple Pages'
     });
-    console.log('✅ [testMultiplePages] Hoàn thành!');
-    return result;
+}
+
+// ==================== RUN ALL TESTS ====================
+
+/**
+ * Helper: Lấy file PDF từ input element
+ */
+export function getPdfFileFromInput(fileInputId: string = 'pdfFile'): File {
+    const fileInput = document.getElementById(fileInputId) as HTMLInputElement | null;
+    
+    if (!fileInput) {
+        throw new Error(`Không tìm thấy input element với id="${fileInputId}"`);
+    }
+    
+    if (!fileInput.files || !fileInput.files[0]) {
+        throw new Error('Vui lòng chọn file PDF trước!');
+    }
+    
+    return fileInput.files[0];
 }
 
 /**
- * Chạy tất cả các test case lần lượt
- * Yêu cầu có input element với id='pdfFile' và 'authToken' trong DOM
- * @returns Promise<void>
+ * Chạy tất cả 7 test cases
+ * 
+ * Yêu cầu:
+ * - Có input element với id='pdfFile' trong DOM
+ * - File PDF đã được chọn
+ * 
+ * @param token - Bearer token để xác thực
+ * @param fileInputId - ID của input element (default: 'pdfFile')
+ * 
  * @example
  * // Trong browser console:
- * await runAllTests();
+ * await runAllTests('YOUR_TOKEN');
  */
-export async function runAllTests(token: string): Promise<void> {
+export async function runAllTests(token: string, fileInputId: string = 'pdfFile'): Promise<void> {
     console.log('\n========================================');
-    console.log('🚀 [runAllTests] Bắt đầu chạy tất cả test cases');
+    console.log('🚀 Bắt đầu chạy TẤT CẢ 7 test cases');
     console.log('========================================\n');
-    // Get file input element
-    const fileInput = document.getElementById('pdfFile') as HTMLInputElement | null;
-    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-        console.error('❌ [runAllTests] Vui lòng chọn file PDF trước!');
-        return;
-    }
-    
-    const pdfFile: File = fileInput.files[0];
-    
-    console.log('📄 [runAllTests] File được chọn:', pdfFile.name);
-    console.log('📊 [runAllTests] Kích thước:', (pdfFile.size / 1024).toFixed(2), 'KB');
-    console.log('🔑 [runAllTests] Token:', token.substring(0, 20) + '...');
-    console.log('');
-    
-    const startTime = Date.now();
-    let passedTests = 0;
-    let failedTests = 0;
     
     try {
-        // Run each test
-        console.log('⏱️ [runAllTests] Test 1/7...');
+        const pdfFile = getPdfFileFromInput(fileInputId);
+        
+        console.log('📄 File:', pdfFile.name);
+        console.log('📊 Size:', (pdfFile.size / 1024).toFixed(2), 'KB');
+        console.log('🔑 Token:', token.substring(0, 20) + '...\n');
+        
+        const startTime = Date.now();
+        
+        // Chạy từng test
+        console.log('⏱️ Test 1/7: Hidden Signature...');
         await testEmptyCoordinates(pdfFile, token);
-        passedTests++;
-        console.log('---\n');
         
-        console.log('⏱️ [runAllTests] Test 2/7...');
+        console.log('⏱️ Test 2/7: TextOnly...');
         await testTextOnlySignature(pdfFile, token);
-        passedTests++;
-        console.log('---\n');
         
-        console.log('⏱️ [runAllTests] Test 3/7...');
+        console.log('⏱️ Test 3/7: ImageOnly...');
         await testImageOnlySignature(pdfFile, token);
-        passedTests++;
-        console.log('---\n');
         
-        console.log('⏱️ [runAllTests] Test 4/7...');
+        console.log('⏱️ Test 4/7: ImageAndText...');
         await testImageAndTextSignature(pdfFile, token);
-        passedTests++;
-        console.log('---\n');
         
-        console.log('⏱️ [runAllTests] Test 5/7...');
+        console.log('⏱️ Test 5/7: ImageNameDateComment...');
         await testImageNameDateCommentSignature(pdfFile, token);
-        passedTests++;
-        console.log('---\n');
         
-        console.log('⏱️ [runAllTests] Test 6/7...');
+        console.log('⏱️ Test 6/7: Multiple Signatures...');
         await testMultipleSignatures(pdfFile, token);
-        passedTests++;
-        console.log('---\n');
         
-        // await testMultiplePages(pdfFile, token); // Uncomment if PDF has multiple pages
+        console.log('⏱️ Test 7/7: Multiple Pages...');
+        await testMultiplePages(pdfFile, token);
         
-        const endTime = Date.now();
-        const duration = ((endTime - startTime) / 1000).toFixed(2);
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         
         console.log('\n========================================');
-        console.log('✅ [runAllTests] Tất cả test cases hoàn thành!');
-        console.log(`⏱️ [runAllTests] Thời gian: ${duration}s`);
-        console.log(`📊 [runAllTests] Kết quả: ${passedTests} passed, ${failedTests} failed`);
+        console.log('✅ TẤT CẢ 7 TESTS HOÀN THÀNH!');
+        console.log(`⏱️ Thời gian: ${duration}s`);
         console.log('========================================\n');
+        
     } catch (error) {
-        failedTests++;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('\n========================================');
-        console.error('❌ [runAllTests] Test failed:', errorMessage);
-        console.error('📊 [runAllTests] Kết quả: ', passedTests, 'passed,', failedTests, 'failed');
+        console.error('❌ TEST FAILED:', errorMessage);
         console.error('========================================\n');
         throw error;
     }
 }
 
-// ==================== MODULE INITIALIZATION ====================
+// ==================== MODULE INFO ====================
 
 console.log('\n========================================');
-console.log('✅ Test functions loaded & exported!');
+console.log('✅ TEST FUNCTIONS LOADED!');
 console.log('========================================');
 console.log('\n📦 Exported Functions:');
-console.log('  - signPdfAdvanced(pdfFile, coordinates, options)');
-console.log('  - testEmptyCoordinates(pdfFile, token)');
-console.log('  - testTextOnlySignature(pdfFile, token)');
-console.log('  - testImageOnlySignature(pdfFile, token)');
-console.log('  - testImageAndTextSignature(pdfFile, token)');
-console.log('  - testImageNameDateCommentSignature(pdfFile, token)');
-console.log('  - testMultipleSignatures(pdfFile, token)');
-console.log('  - testMultiplePages(pdfFile, token)');
-console.log('  - runAllTests()');
-console.log('\n🚀 Quick start:');
-console.log('  await runAllTests()');
+console.log('  1. signPdfAdvanced(pdfFile, coordinates, options)');
+console.log('  2. testEmptyCoordinates(pdfFile, token)');
+console.log('  3. testTextOnlySignature(pdfFile, token)');
+console.log('  4. testImageOnlySignature(pdfFile, token)');
+console.log('  5. testImageAndTextSignature(pdfFile, token)');
+console.log('  6. testImageNameDateCommentSignature(pdfFile, token)');
+console.log('  7. testMultipleSignatures(pdfFile, token)');
+console.log('  8. testMultiplePages(pdfFile, token)');
+console.log('  9. runAllTests(token, fileInputId?)');
+console.log('\n🚀 Quick Start:');
+console.log('  const token = "YOUR_TOKEN";');
+console.log('  await runAllTests(token);  // Chạy tất cả 7 tests');
+console.log('\n  // Hoặc chạy từng test riêng lẻ:');
+console.log('  const file = getPdfFileFromInput("pdfFile");');
+console.log('  await testTextOnlySignature(file, token);');
 console.log('========================================\n');
