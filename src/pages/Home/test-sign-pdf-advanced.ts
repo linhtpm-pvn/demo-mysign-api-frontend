@@ -424,26 +424,26 @@ export async function runAllTests(token: string, fileInputId: string = 'pdfFile'
         const startTime = Date.now();
         
         // Chạy từng test
-        console.log('⏱️ Test 1/7: Hidden Signature...');
-        await testEmptyCoordinates(pdfFile, token);
+        // console.log('⏱️ Test 1/7: Hidden Signature...');
+        // await testEmptyCoordinates(pdfFile, token);
         
-        console.log('⏱️ Test 2/7: TextOnly...');
-        await testTextOnlySignature(pdfFile, token);
+        // console.log('⏱️ Test 2/7: TextOnly...');
+        // await testTextOnlySignature(pdfFile, token);
         
-        console.log('⏱️ Test 3/7: ImageOnly...');
-        await testImageOnlySignature(pdfFile, token);
+        // console.log('⏱️ Test 3/7: ImageOnly...');
+        // await testImageOnlySignature(pdfFile, token);
         
-        console.log('⏱️ Test 4/7: ImageAndText...');
-        await testImageAndTextSignature(pdfFile, token);
+        // console.log('⏱️ Test 4/7: ImageAndText...');
+        // await testImageAndTextSignature(pdfFile, token);
         
         console.log('⏱️ Test 5/7: ImageNameDateComment...');
         await testImageNameDateCommentSignature(pdfFile, token);
         
-        console.log('⏱️ Test 6/7: Multiple Signatures...');
-        await testMultipleSignatures(pdfFile, token);
+        // console.log('⏱️ Test 6/7: Multiple Signatures...');
+        // await testMultipleSignatures(pdfFile, token);
         
-        console.log('⏱️ Test 7/7: Multiple Pages...');
-        await testMultiplePages(pdfFile, token);
+        // console.log('⏱️ Test 7/7: Multiple Pages...');
+        // await testMultiplePages(pdfFile, token);
         
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
         

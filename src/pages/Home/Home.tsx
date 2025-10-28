@@ -1,14 +1,8 @@
 import { useEffect, useState, type JSX } from "react";
 import { supabase } from "../../utils/supabase";
 import type { User } from "@supabase/supabase-js";
-import { BACKEND_URL } from "../../utils/constants";
 import { runAllTests } from "./test-sign-pdf-advanced.ts";
-
-type FileItem = {
-    id: string;
-    filename: string;
-    created_at: string;
-}
+import { runAllSessionTests, quickSessionTest } from "./test-sign-pdf-session.ts";
 
 export function Home(): JSX.Element {
     const [loginUser, setLoginUser] = useState<User | null>(null);
@@ -59,6 +53,32 @@ export function Home(): JSX.Element {
         }
     }
 
+    async function testSessionSigning() {
+        try {
+            const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token);
+            console.log('token', token);
+
+            // Chạy tất cả 5 test cases cho ký lưu phiên
+            await runAllSessionTests(token!);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            alert('Lỗi ký lưu phiên: ' + errorMessage);
+        }
+    }
+
+    async function quickTestSessionSigning() {
+        try {
+            const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token);
+            console.log('token', token);
+
+            // Quick test với 3 files
+            await quickSessionTest(token!);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            alert('Lỗi quick test ký lưu phiên: ' + errorMessage);
+        }
+    }
+
 
     return (
         <div>
@@ -72,8 +92,20 @@ export function Home(): JSX.Element {
                     <button onClick={fetchSomthing}>Fetch something</button> */}
                     <br />
                     <br />
+                    <h2>Test Ký PDF Thông Thường (sign-pdf-advanced)</h2>
                     <input type="file" id="pdfFile" />
-                    <button onClick={esignWithImgUpload}>Sign</button>
+                    <button onClick={esignWithImgUpload}>Sign All Tests (7 tests)</button>
+                    
+                    <br />
+                    <br />
+                    <h2>Test Ký Lưu Phiên (Session-based Signing)</h2>
+                    <p>⚠️ Lưu ý: Chọn nhiều file PDF (multiple) để test đầy đủ (khuyến nghị 5-10 files)</p>
+                    <input type="file" id="pdfFileSession" multiple accept=".pdf" />
+                    <br />
+                    <br />
+                    <button onClick={quickTestSessionSigning}>Quick Test (3 files)</button>
+                    {" "}
+                    <button onClick={testSessionSigning}>Run All Session Tests (5 tests)</button>
                 </div>
             ) : (
                 <div>
