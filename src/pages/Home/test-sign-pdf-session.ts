@@ -53,13 +53,13 @@ export interface SignPdfOptions {
 
 /** Tùy chọn riêng cho start-transaction */
 export interface StartTransactionOptions extends SignPdfOptions {
-    durationInMinute: number;         // Thời gian phiên ký có hiệu lực (phút)
     transactionSignatureNumber: number; // Số lượng chữ ký tối đa trong phiên
 }
 
 /** Tùy chọn riêng cho continue-transaction */
 export interface ContinueTransactionOptions extends SignPdfOptions {
-    firstTimeSAD: string;  // Token SAD từ lần ký trước
+    firstTimeSAD: string;       // Token SAD từ lần ký trước
+    durationInMinute?: number;  // Thời gian gia hạn phiên (phút) - tùy chọn
 }
 
 /** Response từ start-transaction và continue-transaction */
@@ -108,14 +108,13 @@ function logFormData(formData: FormData, prefix: string = 'FormData'): void {
  * 
  * @param pdfFile - File PDF cần ký
  * @param signatureCoordinates - Mảng tọa độ chữ ký, hoặc null để ký ẩn
- * @param options - Các tùy chọn bổ sung (bao gồm durationInMinute và transactionSignatureNumber)
+ * @param options - Các tùy chọn bổ sung (bao gồm transactionSignatureNumber)
  * @returns Promise<SessionSignResponse> - Blob của file PDF đã ký + SAD token + expireDate
  * 
  * @example
- * // Bắt đầu phiên ký với thời gian 30 phút, tối đa 10 lần ký
+ * // Bắt đầu phiên ký với tối đa 10 lần ký
  * const result = await startTransaction(pdfFile, coordinates, {
  *   token: 'YOUR_TOKEN',
- *   durationInMinute: 30,
  *   transactionSignatureNumber: 10,
  *   reason: 'Phê duyệt hợp đồng',
  *   location: 'Hà Nội'
@@ -134,7 +133,6 @@ export async function startTransaction(
         fileSize: pdfFile.size,
         hasCoordinates: !!signatureCoordinates,
         coordinatesCount: signatureCoordinates?.length || 0,
-        durationInMinute: options.durationInMinute,
         transactionSignatureNumber: options.transactionSignatureNumber,
         options
     });
@@ -149,7 +147,6 @@ export async function startTransaction(
     }
     
     // Bước 3: Thêm tham số bắt buộc cho start-transaction
-    formData.append('DurationInMinute', options.durationInMinute.toString());
     formData.append('TransactionSignatureNumber', options.transactionSignatureNumber.toString());
     
     // Bước 4: Thêm các tùy chọn khác
@@ -256,7 +253,7 @@ export async function startTransaction(
  * 
  * @param pdfFile - File PDF cần ký
  * @param signatureCoordinates - Mảng tọa độ chữ ký, hoặc null để ký ẩn
- * @param options - Các tùy chọn bổ sung (bao gồm firstTimeSAD)
+ * @param options - Các tùy chọn bổ sung (bao gồm firstTimeSAD và durationInMinute tùy chọn)
  * @returns Promise<SessionSignResponse> - Blob của file PDF đã ký + SAD token mới
  * 
  * @example
@@ -264,6 +261,15 @@ export async function startTransaction(
  * const result = await continueTransaction(pdfFile2, coordinates, {
  *   token: 'YOUR_TOKEN',
  *   firstTimeSAD: previousSAD,
+ *   reason: 'Phê duyệt hợp đồng',
+ *   location: 'Hà Nội'
+ * });
+ * 
+ * // Hoặc gia hạn phiên thêm 60 phút:
+ * const result = await continueTransaction(pdfFile2, coordinates, {
+ *   token: 'YOUR_TOKEN',
+ *   firstTimeSAD: previousSAD,
+ *   durationInMinute: 60,
  *   reason: 'Phê duyệt hợp đồng',
  *   location: 'Hà Nội'
  * });
@@ -303,9 +309,14 @@ export async function continueTransaction(
     }
     
     // Bước 3: Thêm SAD token (QUAN TRỌNG!)
-    // Thử cả 2 cách: FirstTimeSAD và firstTimeSAD để đảm bảo backend nhận được
     formData.append('FirstTimeSAD', options.firstTimeSAD);
     console.log('📤 [continueTransaction] Đã append FirstTimeSAD vào FormData:', options.firstTimeSAD.substring(0, 50));
+    
+    // Bước 3.5: Thêm DurationInMinute nếu được cung cấp (để gia hạn phiên)
+    if (options.durationInMinute !== undefined) {
+        formData.append('DurationInMinute', options.durationInMinute.toString());
+        console.log('⏰ [continueTransaction] Gia hạn phiên thêm:', options.durationInMinute, 'phút');
+    }
     
     // Bước 4: Thêm các tùy chọn khác
     if (options.certificateId) {
@@ -439,7 +450,6 @@ export async function testBasicSession(pdfFiles: File[], token: string): Promise
     console.log('\n📝 BƯỚC 1/3: Ký tài liệu đầu tiên (CẦN xác thực trên điện thoại)...');
     const result1 = await startTransaction(pdfFiles[0], coordinates, {
         token,
-        durationInMinute: 30,
         transactionSignatureNumber: 5,
         reason: 'Test session signing - Doc 1',
         location: 'Hà Nội',
@@ -508,7 +518,6 @@ export async function testSessionWithDifferentSignTypes(pdfFiles: File[], token:
     
     const result1 = await startTransaction(pdfFiles[0], coords1, {
         token,
-        durationInMinute: 30,
         transactionSignatureNumber: 10,
         reason: 'Test TextOnly',
         location: 'Hà Nội'
@@ -604,7 +613,6 @@ export async function testSessionWithMultipleSignatures(pdfFiles: File[], token:
     
     const result1 = await startTransaction(pdfFiles[0], coords1, {
         token,
-        durationInMinute: 30,
         transactionSignatureNumber: 5,
         reason: 'Test multiple signatures in session',
         location: 'Hà Nội'
@@ -669,7 +677,6 @@ export async function testSessionWithHiddenSignatures(pdfFiles: File[], token: s
     console.log('\n📝 File 1: Hidden signature...');
     const result1 = await startTransaction(pdfFiles[0], null, {
         token,
-        durationInMinute: 30,
         transactionSignatureNumber: 5,
         reason: 'Test hidden signature in session',
         location: 'Hà Nội'
@@ -716,7 +723,6 @@ export async function testSessionStressTest(pdfFiles: File[], token: string, max
     console.log(`\n📝 [1/${maxFiles}] Ký file đầu tiên (CẦN xác thực)...`);
     let result = await startTransaction(pdfFiles[0], coordinates, {
         token,
-        durationInMinute: 30,
         transactionSignatureNumber: maxFiles,
         reason: `Stress test - Document 1/${maxFiles}`,
         location: 'Hà Nội'
